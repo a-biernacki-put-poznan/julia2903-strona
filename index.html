@@ -141,6 +141,24 @@
     <div class="list" id="list"></div>
     <div id="removedBox"></div>
 
+    <div id="ghBox" style="display:none">
+      <h3>☁️ Zapisz zmiany na stronie (dla wszystkich)</h3>
+      <div style="font-size:12px;color:var(--mut);line-height:1.45">Bez tego dodane osoby, kategorie i usunięcia są tylko w tej przeglądarce. Właściciel strony może je opublikować dla wszystkich. Potrzebny jest jednorazowo token z GitHuba.</div>
+      <div class="msg" id="ghStatus" style="font-size:13px"></div>
+      <div id="ghTokBox">
+        <ol style="font-size:12px;color:var(--mut);line-height:1.5;padding-left:18px;margin:6px 0">
+          <li>Otwórz <a style="color:var(--acc)" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a></li>
+          <li><b>Repository access</b> → Only select repositories → <span id="ghRepoName"></span></li>
+          <li><b>Permissions</b> → Repository permissions → <b>Contents: Read and write</b></li>
+          <li>Kliknij <b>Generate token</b>, skopiuj go i wklej poniżej</li>
+        </ol>
+        <div class="f2"><input type="password" id="ghTok" placeholder="github_pat_…" autocomplete="off"><button id="ghTokSave" style="flex:0 0 auto">Zapisz token</button></div>
+      </div>
+      <button class="ok" id="ghPublish" style="width:100%;margin-top:8px">☁️ Opublikuj zmiany dla wszystkich</button>
+      <div class="msg" id="ghMsg"></div>
+      <button id="ghForget" style="margin-top:4px;font-size:12px;padding:6px 10px;display:none">Usuń token z tego urządzenia</button>
+    </div>
+
     <h3>🔁 Ta sama lista u drugiej osoby</h3>
     <div style="font-size:12px;color:var(--mut);line-height:1.4">Żeby numer dawał tę samą planszę, obie osoby muszą mieć ten sam <b>kod gry</b> (widać go nad planszą). Jeśli się różni, skopiuj paczkę i wyślij ją drugiej osobie, a ona wkleja ją u siebie. Paczka zawiera dodane osoby i zmiany kategorii.</div>
     <div class="row2" style="margin-top:8px">
@@ -182,9 +200,16 @@ let removed=new Set(LS.get('zka_removed',[]));
 let extraCats=[]; // nowe kategorie utworzone w formularzu, jeszcze bez osób
 function persist(){return LS.set('zka_custom',custom)&&LS.set('zka_over',overrides)&&LS.set('zka_removed',[...removed])}
 const key=n=>n.trim().toLowerCase();
-const baseCats=n=>clean(BASE.find(b=>key(b.n)===key(n)).c);
+let shared={custom:[],overrides:{},removed:[]};
+const validP=p=>p&&typeof p.n==='string'&&typeof p.img==='string'&&p.img.startsWith('data:image/');
+function setShared(d){shared={custom:(Array.isArray(d&&d.custom)?d.custom:[]).filter(validP).map(p=>({n:p.n.slice(0,40),img:p.img,c:clean(p.c).length?clean(p.c):['Inne']})),
+  overrides:Object.fromEntries(Object.entries((d&&d.overrides)||{}).map(([k,v])=>[k,clean(v)]).filter(([k,v])=>v.length)),
+  removed:(Array.isArray(d&&d.removed)?d.removed:[]).filter(k=>typeof k==='string')};}
+function baseLike(){const m=new Map();BASE.forEach(p=>m.set(key(p.n),{n:p.n,img:p.img,c:clean(p.c)}));shared.custom.forEach(p=>{if(!m.has(key(p.n)))m.set(key(p.n),{n:p.n,img:p.img,c:clean(p.c)})});return m;}
+const baseCats=n=>{const k=key(n);return shared.overrides[k]||(baseLike().get(k)||{c:[]}).c;};
 function all(){const m=new Map();
-  BASE.forEach(p=>{if(!removed.has(key(p.n)))m.set(key(p.n),{...p,c:overrides[key(p.n)]||clean(p.c),base:true})});
+  const sr=new Set(shared.removed);
+  baseLike().forEach((p,k)=>{if(sr.has(k)||removed.has(k))return;m.set(k,{...p,c:overrides[k]||shared.overrides[k]||p.c,base:true})});
   custom.forEach(p=>{if(!m.has(key(p.n)))m.set(key(p.n),{...p,base:false})});
   return[...m.values()].sort((a,b)=>a.n.localeCompare(b.n,'pl'));}
 function categories(){const s=new Map();all().forEach(p=>p.c.forEach(c=>s.set(c,(s.get(c)||0)+1)));extraCats.forEach(c=>{if(!s.has(c))s.set(c,0)});return[...s.entries()].sort((a,b)=>a[0].localeCompare(b[0],'pl'));}
@@ -220,7 +245,7 @@ function render(){
   if(me>=0&&cards[me]){$('secret').style.display='block';const p=cards[me];$('who').innerHTML=`<img src="${p.img}" alt=""><div>${esc(p.n)}</div>`;$('who').className='who'+(hidden?' hid':'');}
   else $('secret').style.display='none';
 }
-function load(n){n=Math.max(1,Math.min(999999,parseInt(n)||1));cur=n;$('num').value=n;cards=board(n);elim=new Set();me=-1;hidden=true;render();renderSettings();renderAdd();LS.set('zka_num',n);}
+function load(n){n=Math.max(1,Math.min(999999,parseInt(n)||1));cur=n;$('num').value=n;cards=board(n);elim=new Set();me=-1;hidden=true;render();renderSettings();renderAdd();renderGh();LS.set('zka_num',n);}
 function rebuild(){load(cur)}
 
 $('load').onclick=()=>load($('num').value);
@@ -284,7 +309,7 @@ $('save').onclick=()=>{
   if(!persist()){custom.pop();msg('Brak miejsca w pamięci przeglądarki – usuń kogoś z listy.',true);return;}
   addToActive(c);
   newImg=null;$('newName').value='';$('prev').style.display='none';
-  msg('Dodano: '+n+' → '+c.join(', ')+' ✔');rebuild();checkSave();
+  msg('Dodano: '+n+' → '+c.join(', ')+' ✔'+(ON_GH?' Żeby widzieli to wszyscy, kliknij niżej ☁️ Opublikuj.':''));rebuild();checkSave();
 };
 function addToActive(c){if(settings.cats){c.forEach(x=>{if(!settings.cats.includes(x))settings.cats.push(x)});LS.set('zka_set',settings);}}
 $('search').oninput=renderAdd;
@@ -313,7 +338,7 @@ function renderAdd(){
       row.querySelector('button').onclick=go;row.querySelector('input').onkeydown=e=>{if(e.key==='Enter')go();};
       ed.appendChild(row);d.appendChild(ed);}
     L.appendChild(d);});
-  const R=$('removedBox');R.innerHTML='';const rem=BASE.filter(b=>removed.has(key(b.n)));
+  const R=$('removedBox');R.innerHTML='';const rem=[...baseLike().values()].filter(b=>removed.has(key(b.n)));
   if(rem.length){R.innerHTML=`<div style="font-size:13px;font-weight:700;margin-top:10px">Usunięte osoby z bazy (${rem.length})</div>`;
     const w=document.createElement('div');w.className='list';
     rem.forEach(p=>{const d=document.createElement('div');d.className='chip';d.innerHTML=`<img src="${p.img}" alt="" style="filter:grayscale(1)"><span>${esc(p.n)}</span><button class="res">↩ Przywróć</button>`;
@@ -338,7 +363,7 @@ $('importDo').onclick=()=>{
   const arr=Array.isArray(data)?data:(data.custom||[]);let added=0,moved=0;
   arr.forEach(p=>{if(!p||typeof p.n!=='string'||typeof p.img!=='string'||!p.img.startsWith('data:image/'))return;
     const c=clean(p.c).length?clean(p.c):['Inne'],ex=custom.find(x=>key(x.n)===key(p.n));
-    if(ex){if(ex.c.join('|')!==c.join('|')){ex.c=c;moved++;}}else if(!BASE.some(b=>key(b.n)===key(p.n))){custom.push({n:p.n.slice(0,40),img:p.img,c});added++;}});
+    if(ex){if(ex.c.join('|')!==c.join('|')){ex.c=c;moved++;}}else if(!baseLike().has(key(p.n))){custom.push({n:p.n.slice(0,40),img:p.img,c});added++;}});
   if(data.overrides&&typeof data.overrides==='object')Object.entries(data.overrides).forEach(([k,v])=>{const c=clean(v);if(c.length){overrides[k]=c;moved++;}});
   if(Array.isArray(data.removed))data.removed.forEach(k=>{if(typeof k==='string')removed.add(k)});
   if(!persist()){msg('Brak miejsca w pamięci przeglądarki.',true);return;}
@@ -374,7 +399,57 @@ $('saveHtml').onclick=async()=>{
   catch(e){smsg('Ta przeglądarka nie pozwala zapisać pliku.',true);}
 };
 
+// ---------- wspólna lista na stronie (GitHub) ----------
+const ON_GH=/\.github\.io$/i.test(location.hostname);
+function repoInfo(){const h=location.hostname;if(ON_GH){const owner=h.split('.')[0],seg=location.pathname.split('/').filter(Boolean)[0];return owner+'/'+(seg&&!/\.html?$/i.test(seg)?seg:h);}return 'a-biernacki-put-poznan/julia2903-strona';}
+const ghTok=()=>LS.get('zka_ghtok','');
+const localChanges=()=>custom.length+Object.keys(overrides).length+removed.size;
+function computeShared(){const A=all(),bmap=new Map(BASE.map(b=>[key(b.n),b])),have=new Set(A.map(p=>key(p.n))),out={custom:[],overrides:{},removed:[]};
+  A.forEach(p=>{const kk=key(p.n),b=bmap.get(kk);
+    if(b){const bc=clean(b.c);if(!(bc.length===p.c.length&&bc.every(x=>p.c.includes(x))))out.overrides[kk]=p.c;}
+    else out.custom.push({n:p.n,img:p.img,c:p.c});});
+  bmap.forEach((b,kk)=>{if(!have.has(kk))out.removed.push(kk)});return out;}
+function b64(str){const by=new TextEncoder().encode(str);let bin='';for(let i=0;i<by.length;i+=0x8000)bin+=String.fromCharCode.apply(null,by.subarray(i,i+0x8000));return btoa(bin);}
+function ghmsg(t,bad){$('ghMsg').textContent=t;$('ghMsg').style.color=bad?'#ff7b7b':'var(--acc)';}
+function renderGh(){
+  if(!ON_GH)return;$('ghBox').style.display='block';$('ghRepoName').textContent=repoInfo();
+  const t=!!ghTok(),n=localChanges();
+  $('ghTokBox').style.display=t?'none':'block';$('ghForget').style.display=t?'inline-block':'none';
+  $('ghPublish').disabled=!t||!n;
+  $('ghStatus').textContent=(n?`Niewysłane zmiany na tym urządzeniu: ${n}. `:'Wszystko jest opublikowane ✔ ')+(t?'':'Najpierw wklej token.');
+}
+$('ghTokSave').onclick=()=>{const v=$('ghTok').value.trim();if(!v){ghmsg('Wklej token.',true);return;}LS.set('zka_ghtok',v);$('ghTok').value='';ghmsg('Token zapisany na tym urządzeniu ✔');renderGh();};
+$('ghForget').onclick=()=>{LS.set('zka_ghtok','');ghmsg('Token usunięty z tego urządzenia.');renderGh();};
+$('ghPublish').onclick=async()=>{
+  const tok=ghTok(),repo=repoInfo();if(!tok)return;
+  const btn=$('ghPublish');btn.disabled=true;ghmsg('Wysyłam na GitHuba…');
+  try{
+    const data=computeShared(),url=`https://api.github.com/repos/${repo}/contents/osoby.json`,H={Authorization:'Bearer '+tok,Accept:'application/vnd.github+json'};
+    let sha;const g=await fetch(url+'?ref=main&t='+Date.now(),{headers:H,cache:'no-store'});
+    if(g.status===200)sha=(await g.json()).sha;else if(g.status===401)throw new Error('Token jest nieprawidłowy albo wygasł – usuń go i wklej nowy.');else if(g.status!==404)throw new Error('GitHub odpowiedział '+g.status+'.');
+    const r=await fetch(url,{method:'PUT',headers:H,body:JSON.stringify({message:'Aktualizacja osób w grze',content:b64(JSON.stringify(data)),sha,branch:'main'})});
+    if(!r.ok){const e=await r.json().catch(()=>({}));
+      if(r.status===403||r.status===404)throw new Error('Token nie ma uprawnień do zapisu w '+repo+' (Contents: Read and write).');
+      throw new Error('GitHub: '+r.status+' '+(e.message||''));}
+    setShared(data);LS.set('zka_shared_cache',{t:Date.now(),d:data});
+    custom=[];overrides={};removed=new Set();persist();
+    ghmsg('Opublikowano ✔ Za 1–2 minuty wszyscy zobaczą zmiany (czasem do 10 minut).');rebuild();
+  }catch(e){ghmsg(e.message||String(e),true);renderGh();}
+};
+async function loadShared(){
+  if(location.protocol!=='https:'&&location.protocol!=='http:')return;
+  let d=null;
+  try{const tok=ghTok();
+    if(tok&&ON_GH){const r=await fetch(`https://api.github.com/repos/${repoInfo()}/contents/osoby.json?ref=main&t=${Date.now()}`,{headers:{Authorization:'Bearer '+tok,Accept:'application/vnd.github.raw+json'},cache:'no-store'});if(r.ok)d=await r.json();}
+    if(!d){const r=await fetch('osoby.json?t='+Date.now(),{cache:'no-store'});if(r.ok)d=await r.json();}
+  }catch(e){}
+  const c=LS.get('zka_shared_cache',null);
+  if(c&&c.d&&Date.now()-c.t<15*60*1000&&!(d&&JSON.stringify(d)===JSON.stringify(c.d)))d=c.d; // świeżo opublikowane, strona może jeszcze pokazywać starą wersję
+  if(d){setShared(d);rebuild();}
+}
+
 load(LS.get('zka_num',0)||1+Math.floor(Math.random()*999999));
+loadShared();
 </script>
 </body>
 </html>
