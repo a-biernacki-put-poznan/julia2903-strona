@@ -99,7 +99,7 @@
   </div>
 
   <!-- USTAWIENIA -->
-  <div class="row2"><button id="saveHtml" class="ok">💾 Zapisz grę jako plik HTML (do wysłania)</button></div>
+  <div class="row2"><button id="saveHtml" class="ok">💾 Zapisz grę jako plik (wyślij właścicielowi)</button></div>
   <div class="msg" id="saveMsg" style="text-align:center;margin:-2px 0 8px"></div>
 
   <div class="panel" id="pSet" style="display:none">
@@ -119,6 +119,13 @@
 
   <!-- DODAWANIE -->
   <div class="panel" id="pAdd" style="display:none">
+    <div style="background:#2b2740;border-radius:12px;padding:10px;font-size:12px;line-height:1.5;margin-bottom:12px">
+      <b>Chcesz dodać kogoś do gry na stronie?</b><br>
+      1. Dodaj osoby poniżej (imię, kategoria, zdjęcie).<br>
+      2. Kliknij u góry <b>💾 Zapisz grę jako plik</b>. Zapisze się plik <b>index.html</b>.<br>
+      3. Wyślij ten plik właścicielowi strony (np. Messengerem). On wgra go na stronę i nowe osoby zobaczą wszyscy.<br>
+      <span style="color:var(--mut)">Do tego czasu dodane osoby widzisz tylko Ty, w tej przeglądarce.</span>
+    </div>
     <h2>➕ Dodaj osobę</h2>
     <input type="text" id="newName" placeholder="Imię i nazwisko" maxlength="40" style="width:100%">
     <div style="font-size:12px;color:var(--mut);margin-top:10px">Kategorie (możesz zaznaczyć kilka):</div>
@@ -140,24 +147,6 @@
     <input type="text" id="search" placeholder="🔍 Szukaj osoby…" style="width:100%;margin-top:8px">
     <div class="list" id="list"></div>
     <div id="removedBox"></div>
-
-    <div id="ghBox" style="display:none">
-      <h3>☁️ Zapisz zmiany na stronie (dla wszystkich)</h3>
-      <div style="font-size:12px;color:var(--mut);line-height:1.45">Bez tego dodane osoby, kategorie i usunięcia są tylko w tej przeglądarce. Właściciel strony może je opublikować dla wszystkich. Potrzebny jest jednorazowo token z GitHuba.</div>
-      <div class="msg" id="ghStatus" style="font-size:13px"></div>
-      <div id="ghTokBox">
-        <ol style="font-size:12px;color:var(--mut);line-height:1.5;padding-left:18px;margin:6px 0">
-          <li>Otwórz <a style="color:var(--acc)" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a></li>
-          <li><b>Repository access</b> → Only select repositories → <span id="ghRepoName"></span></li>
-          <li><b>Permissions</b> → Repository permissions → <b>Contents: Read and write</b></li>
-          <li>Kliknij <b>Generate token</b>, skopiuj go i wklej poniżej</li>
-        </ol>
-        <div class="f2"><input type="password" id="ghTok" placeholder="github_pat_…" autocomplete="off"><button id="ghTokSave" style="flex:0 0 auto">Zapisz token</button></div>
-      </div>
-      <button class="ok" id="ghPublish" style="width:100%;margin-top:8px">☁️ Opublikuj zmiany dla wszystkich</button>
-      <div class="msg" id="ghMsg"></div>
-      <button id="ghForget" style="margin-top:4px;font-size:12px;padding:6px 10px;display:none">Usuń token z tego urządzenia</button>
-    </div>
 
     <h3>🔁 Ta sama lista u drugiej osoby</h3>
     <div style="font-size:12px;color:var(--mut);line-height:1.4">Żeby numer dawał tę samą planszę, obie osoby muszą mieć ten sam <b>kod gry</b> (widać go nad planszą). Jeśli się różni, skopiuj paczkę i wyślij ją drugiej osobie, a ona wkleja ją u siebie. Paczka zawiera dodane osoby i zmiany kategorii.</div>
@@ -245,7 +234,7 @@ function render(){
   if(me>=0&&cards[me]){$('secret').style.display='block';const p=cards[me];$('who').innerHTML=`<img src="${p.img}" alt=""><div>${esc(p.n)}</div>`;$('who').className='who'+(hidden?' hid':'');}
   else $('secret').style.display='none';
 }
-function load(n){n=Math.max(1,Math.min(999999,parseInt(n)||1));cur=n;$('num').value=n;cards=board(n);elim=new Set();me=-1;hidden=true;render();renderSettings();renderAdd();renderGh();LS.set('zka_num',n);}
+function load(n){n=Math.max(1,Math.min(999999,parseInt(n)||1));cur=n;$('num').value=n;cards=board(n);elim=new Set();me=-1;hidden=true;render();renderSettings();renderAdd();LS.set('zka_num',n);}
 function rebuild(){load(cur)}
 
 $('load').onclick=()=>load($('num').value);
@@ -309,7 +298,7 @@ $('save').onclick=()=>{
   if(!persist()){custom.pop();msg('Brak miejsca w pamięci przeglądarki – usuń kogoś z listy.',true);return;}
   addToActive(c);
   newImg=null;$('newName').value='';$('prev').style.display='none';
-  msg('Dodano: '+n+' → '+c.join(', ')+' ✔'+(ON_GH?' Żeby widzieli to wszyscy, kliknij niżej ☁️ Opublikuj.':''));rebuild();checkSave();
+  msg('Dodano: '+n+' → '+c.join(', ')+' ✔ Gdy skończysz, kliknij u góry 💾 Zapisz grę i wyślij plik właścicielowi strony.');rebuild();checkSave();
 };
 function addToActive(c){if(settings.cats){c.forEach(x=>{if(!settings.cats.includes(x))settings.cats.push(x)});LS.set('zka_set',settings);}}
 $('search').oninput=renderAdd;
@@ -384,8 +373,8 @@ function buildHtml(){
 }
 function smsg(t,bad){$('saveMsg').textContent=t;$('saveMsg').style.color=bad?'#ff7b7b':'var(--acc)';}
 $('saveHtml').onclick=async()=>{
-  const html=buildHtml(),name='zgadnij-kto-to.html',n=all().length;
-  const okText=`Zapisano ${name} ✔ – ma w sobie ${n} osób, kategorie i ustawienia. Możesz go wysyłać.`;
+  const html=buildHtml(),name='index.html',n=all().length;
+  const okText=`Zapisano plik ${name} ✔ (${n} osób). Wyślij go właścicielowi strony, np. na Messengerze.`;
   if(DL){
     try{await DL.save({filename:name,data:html});smsg(okText);}
     catch(e){const c=e&&e.code;
@@ -399,57 +388,7 @@ $('saveHtml').onclick=async()=>{
   catch(e){smsg('Ta przeglądarka nie pozwala zapisać pliku.',true);}
 };
 
-// ---------- wspólna lista na stronie (GitHub) ----------
-const ON_GH=/\.github\.io$/i.test(location.hostname);
-function repoInfo(){const h=location.hostname;if(ON_GH){const owner=h.split('.')[0],seg=location.pathname.split('/').filter(Boolean)[0];return owner+'/'+(seg&&!/\.html?$/i.test(seg)?seg:h);}return 'a-biernacki-put-poznan/julia2903-strona';}
-const ghTok=()=>LS.get('zka_ghtok','');
-const localChanges=()=>custom.length+Object.keys(overrides).length+removed.size;
-function computeShared(){const A=all(),bmap=new Map(BASE.map(b=>[key(b.n),b])),have=new Set(A.map(p=>key(p.n))),out={custom:[],overrides:{},removed:[]};
-  A.forEach(p=>{const kk=key(p.n),b=bmap.get(kk);
-    if(b){const bc=clean(b.c);if(!(bc.length===p.c.length&&bc.every(x=>p.c.includes(x))))out.overrides[kk]=p.c;}
-    else out.custom.push({n:p.n,img:p.img,c:p.c});});
-  bmap.forEach((b,kk)=>{if(!have.has(kk))out.removed.push(kk)});return out;}
-function b64(str){const by=new TextEncoder().encode(str);let bin='';for(let i=0;i<by.length;i+=0x8000)bin+=String.fromCharCode.apply(null,by.subarray(i,i+0x8000));return btoa(bin);}
-function ghmsg(t,bad){$('ghMsg').textContent=t;$('ghMsg').style.color=bad?'#ff7b7b':'var(--acc)';}
-function renderGh(){
-  if(!ON_GH)return;$('ghBox').style.display='block';$('ghRepoName').textContent=repoInfo();
-  const t=!!ghTok(),n=localChanges();
-  $('ghTokBox').style.display=t?'none':'block';$('ghForget').style.display=t?'inline-block':'none';
-  $('ghPublish').disabled=!t||!n;
-  $('ghStatus').textContent=(n?`Niewysłane zmiany na tym urządzeniu: ${n}. `:'Wszystko jest opublikowane ✔ ')+(t?'':'Najpierw wklej token.');
-}
-$('ghTokSave').onclick=()=>{const v=$('ghTok').value.trim();if(!v){ghmsg('Wklej token.',true);return;}LS.set('zka_ghtok',v);$('ghTok').value='';ghmsg('Token zapisany na tym urządzeniu ✔');renderGh();};
-$('ghForget').onclick=()=>{LS.set('zka_ghtok','');ghmsg('Token usunięty z tego urządzenia.');renderGh();};
-$('ghPublish').onclick=async()=>{
-  const tok=ghTok(),repo=repoInfo();if(!tok)return;
-  const btn=$('ghPublish');btn.disabled=true;ghmsg('Wysyłam na GitHuba…');
-  try{
-    const data=computeShared(),url=`https://api.github.com/repos/${repo}/contents/osoby.json`,H={Authorization:'Bearer '+tok,Accept:'application/vnd.github+json'};
-    let sha;const g=await fetch(url+'?ref=main&t='+Date.now(),{headers:H,cache:'no-store'});
-    if(g.status===200)sha=(await g.json()).sha;else if(g.status===401)throw new Error('Token jest nieprawidłowy albo wygasł – usuń go i wklej nowy.');else if(g.status!==404)throw new Error('GitHub odpowiedział '+g.status+'.');
-    const r=await fetch(url,{method:'PUT',headers:H,body:JSON.stringify({message:'Aktualizacja osób w grze',content:b64(JSON.stringify(data)),sha,branch:'main'})});
-    if(!r.ok){const e=await r.json().catch(()=>({}));
-      if(r.status===403||r.status===404)throw new Error('Token nie ma uprawnień do zapisu w '+repo+' (Contents: Read and write).');
-      throw new Error('GitHub: '+r.status+' '+(e.message||''));}
-    setShared(data);LS.set('zka_shared_cache',{t:Date.now(),d:data});
-    custom=[];overrides={};removed=new Set();persist();
-    ghmsg('Opublikowano ✔ Za 1–2 minuty wszyscy zobaczą zmiany (czasem do 10 minut).');rebuild();
-  }catch(e){ghmsg(e.message||String(e),true);renderGh();}
-};
-async function loadShared(){
-  if(location.protocol!=='https:'&&location.protocol!=='http:')return;
-  let d=null;
-  try{const tok=ghTok();
-    if(tok&&ON_GH){const r=await fetch(`https://api.github.com/repos/${repoInfo()}/contents/osoby.json?ref=main&t=${Date.now()}`,{headers:{Authorization:'Bearer '+tok,Accept:'application/vnd.github.raw+json'},cache:'no-store'});if(r.ok)d=await r.json();}
-    if(!d){const r=await fetch('osoby.json?t='+Date.now(),{cache:'no-store'});if(r.ok)d=await r.json();}
-  }catch(e){}
-  const c=LS.get('zka_shared_cache',null);
-  if(c&&c.d&&Date.now()-c.t<15*60*1000&&!(d&&JSON.stringify(d)===JSON.stringify(c.d)))d=c.d; // świeżo opublikowane, strona może jeszcze pokazywać starą wersję
-  if(d){setShared(d);rebuild();}
-}
-
 load(LS.get('zka_num',0)||1+Math.floor(Math.random()*999999));
-loadShared();
 </script>
 </body>
 </html>
